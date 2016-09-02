@@ -55,7 +55,7 @@ btn7:
 	
 setup:
 	BANKSEL	TRISB		    ; Selecionando BANK0
-	MOVLW	b'11000000'	    ; RA7 e RA6 como entrada, demais como saída
+	MOVLW	b'11000000'	    ; RB7 e RB6 como entrada, demais como saída
 	MOVWF	TRISB		    ; Seta PORTB para saída
 	
 	BANKSEL	OPTION_REG
