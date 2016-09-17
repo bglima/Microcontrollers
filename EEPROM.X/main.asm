@@ -10,14 +10,65 @@
   
 	; Pre-writing data to EE memory, for test purporses
 	ORG	0x2100
-	DE	0x35, "My name is Bruno Gabriel. It's a pleasure to meet you"
+	DE	0x0A, "HelloWorld"
  
 	; Start of code
 	ORG	0x0000
-maxB	EQU	0x20
-curB	EQU	0x21
-iniAdd	EQU	0x22	
+	
+cInd	EQU	0x20
+lInd	EQU	0x21
+rInd	EQU	0x22
+cont	EQU	0x23
+larg	EQU	0x24
+temp	EQU	0x25 
+size	EQU	0x26
+	
+maxB	EQU	0x30
+curB	EQU	0x31
+iniAdd	EQU	0x32	
 	GOTO	setup
+	
+CLEARF	MACRO
+	BCF STATUS, Z
+	BCF STATUS, C
+	ENDM
+	
+GREATEQ	MACRO	VAL1, VAL2
+	CLEARF
+	MOVF  VAL1, W
+	SUBWF VAL2, W
+	MOVLW 0x01	    ; Assume VAL1 >= VAL2
+	BTFSC STATUS,C	    ; If VAL2 is greater... Return 0
+	MOVLW 0x00
+	BTFSC STATUS, Z	    ; If VAL1 is greater... Return 1
+	MOVLW 0x01
+	ENDM
+	
+GREAT	MACRO	VAL1, VAL2
+	CLEARF
+	MOVF  VAL1,w
+	SUBWF VAL2,w
+	MOVLW 0x01	    ; Assume value 1 is greater... Return 1
+	BTFSC STATUS,C	    ; Values are equal...   Return 0
+	MOVLW 0x00
+	BTFSC STATUS,Z	    ; Values are equal...   Return 0
+	MOVLW 0x00
+	ENDM
+
+HEAPIFY	MACRO	index
+	MOVLW	index	    ; Currrent index
+	MOVWF	cInd
+	MOVLW	index*2	    ; Left child index
+	MOVWF	lInd
+	MOVLW	index*2 + 1 ; Right child idex
+	MOVWF	rInd
+	MOVF	maxB, W	    ; Size of array
+	MOVWF	size
+	
+	GREAT	0x22, 0x21  ; Testing greater and greaterOrEq function
+	MOVWF	cont
+	ENDM
+
 	
 rEEByte:		    ; Address to be read must be in W register. The result will override W.
 	BANKSEL	EEADR
@@ -55,8 +106,11 @@ setup:
 	CALL	rEEByte	; Reading bytes max qnt to W
 	MOVWF	INDF	; Moving value read to maxB address
 	CALL	rEEData
+
+	HEAPIFY	1
+	NOP
 	
-loop:
+loop:	
 	GOTO	loop
 	
 	END
