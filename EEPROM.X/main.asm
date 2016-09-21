@@ -15,61 +15,46 @@
 	; Start of code
 	ORG	0x0000
 	
-cInd	EQU	0x20
-lInd	EQU	0x21
-rInd	EQU	0x22
-cont	EQU	0x23
-larg	EQU	0x24
-temp	EQU	0x25 
-size	EQU	0x26
+; HEAPIFY FUNCTION VARIABLES
+cAdd	EQU	0x20	; Current address of element
+lAdd	EQU	0x21	; LeftC	  address of element
+rAdd	EQU	0x22	; RightC  address of element
 	
-maxB	EQU	0x30
-curB	EQU	0x31
-iniAdd	EQU	0x32	
+; BUILD MAX HEAP FUNCTION VARIABLES
+index	EQU	0x23	; Current element index
+larg	EQU	0x24	; Largest index element
+size	EQU	0x25	; Total size of heap
+
+; SWAP FUNCTION VARIABLES
+temp	EQU	0x26	; Temporary variable
+
+; GREAT FUNCTION VARIABLES
+val1	EQU	0x27
+val2	EQU	0x28
+	
+; EEPROM READ VARIABLES
+maxB	EQU	0x30	; Max byte index of heap (size of heap)
+curB	EQU	0x31	; Current address
+iniAdd	EQU	0x32	; Initial address of heap
 	GOTO	setup
 	
-CLEARF	MACRO
+clearf:	; Function that clears flags Z and C from STATUS
 	BCF STATUS, Z
 	BCF STATUS, C
-	ENDM
+	RETURN
 	
-GREATEQ	MACRO	VAL1, VAL2
-	CLEARF
-	MOVF  VAL1, W
-	SUBWF VAL2, W
-	MOVLW 0x01	    ; Assume VAL1 >= VAL2
-	BTFSC STATUS,C	    ; If VAL2 is greater... Return 0
-	MOVLW 0x00
-	BTFSC STATUS, Z	    ; If VAL1 is greater... Return 1
-	MOVLW 0x01
-	ENDM
-	
-GREAT	MACRO	VAL1, VAL2
-	CLEARF
-	MOVF  VAL1,w
-	SUBWF VAL2,w
-	MOVLW 0x01	    ; Assume value 1 is greater... Return 1
-	BTFSC STATUS,C	    ; Values are equal...   Return 0
-	MOVLW 0x00
-	BTFSC STATUS,Z	    ; Values are equal...   Return 0
-	MOVLW 0x00
-	ENDM
+great:	; Function that returns the greatest value among "cInd", "lInd" and "rInd"
+	; Uses registers val1 and val2 (as input) and register W (as output)
+	CALL	clearf	    ; Clear flags before use it
+	MOVF	val1, W
+	SUBWF	val2, W
+	BTFSC	STATUS, Z
+	RETLW	0x00	    ; Values are equal
+	BTFSC	STATUS, C
+	RETLW	0x00	    ; Value2 is greater
+	; val1IsGreater
+	RETLW	0x01
 
-HEAPIFY	MACRO	index
-	MOVLW	index	    ; Currrent index
-	MOVWF	cInd
-	MOVLW	index*2	    ; Left child index
-	MOVWF	lInd
-	MOVLW	index*2 + 1 ; Right child idex
-	MOVWF	rInd
-	MOVF	maxB, W	    ; Size of array
-	MOVWF	size
-	
-	GREAT	0x22, 0x21  ; Testing greater and greaterOrEq function
-	MOVWF	cont
-	ENDM
-
-	
 rEEByte:		    ; Address to be read must be in W register. The result will override W.
 	BANKSEL	EEADR
 	MOVWF	EEADR	    ; Setting address W at EEPROM
@@ -107,7 +92,12 @@ setup:
 	MOVWF	INDF	; Moving value read to maxB address
 	CALL	rEEData
 
-	HEAPIFY	1
+	; Testing great function call
+	MOVLW	0x07
+	MOVWF	val1
+	MOVLW	0x06
+	MOVWF	val2
+	CALL	great
 	NOP
 	
 loop:	
