@@ -62,16 +62,52 @@ SWAPFF	macro	add1, add2
 	ENDM
 
 ; Read value from address "add" to W
-READF	macro	add
-	MOVLW	add
+READF	macro	addr
+	MOVLW	addr
 	MOVWF	FSR
 	MOVF	INDF, W
 	ENDM
+	
+; Check if an index if larger than max index from heap (out of bounds)
+; W = 1 if index is OutOfBounds
+GRTFF	macro   add1, add2
+	CALL	clearf	    ; Clear flags before use it
+	
+	MOVLW	add1
+	MOVWF	FSR
+	MOVF	INDF, W
+	MOVWF	val1
+	
+	MOVLW	add2
+	MOVWF	FSR
+	MOVF	INDF, W
+	MOVWF	val2
+	
+	MOVF	val1, W
+	SUBWF	val2, W
+	MOVLW	0x00	    ; Assume that index is larger than size
+	BTFSS	STATUS, C
+	MOVLW	0x01	    ; Size is greater. Return OutOfBounds (W = 1)
+	ENDM
+
+
 	
 clearf:	; Function that clears flags Z and C from STATUS
 	BCF STATUS, Z
 	BCF STATUS, C
 	RETURN
+	
+great:	; Function that returns if val1 and value2 are equal
+	; Uses registers val1 and val2 (as input) and register W (as output)
+	CALL	clearf	    ; Clear flags before use it
+	MOVF	val1, W
+	SUBWF	val2, W
+	BTFSC	STATUS, Z
+	RETLW	0x00	    ; Values are equal
+	BTFSC	STATUS, C
+	RETLW	0x00	    ; Value2 is greater
+	; val1IsGreater
+	RETLW	0x01
 	
 diff:	; Function that returns if val1 and value2 are equal
 	; Uses registers val1 and val2 (as input) and register W (as output)
@@ -84,18 +120,6 @@ diff:	; Function that returns if val1 and value2 are equal
 	RETLW	0x00	    ; Value2 is greater
 	; val1IsGreater
 	RETLW	0x00
-	
-great:	; Function that returns the greatest value among "cInd", "lInd" and "rInd"
-	; Uses registers val1 and val2 (as input) and register W (as output)
-	CALL	clearf	    ; Clear flags before use it
-	MOVF	val1, W
-	SUBWF	val2, W
-	BTFSC	STATUS, Z
-	RETLW	0x00	    ; Values are equal
-	BTFSC	STATUS, C
-	RETLW	0x00	    ; Value2 is greater
-	; val1IsGreater
-	RETLW	0x01
 
 buildMH: ; buildMaxHeap function. Starts at node size/2 and goes back until it 
 	; reaches the first node.
@@ -144,18 +168,18 @@ loopHY	; Left child
 	BCF	lAdd, 7	    ; Clean MSB so that rotate does not set STATUS, C
 	RLF	lAdd, 1	    ; Rotate rAdd to left and store on its own
 	; if lAdd (stil an index of leftChild)  is greater than size, stop
-	MOVF	lAdd, W
-	MOVWF	val1
-	MOVF	size, W
-	MOVWF	val2
-	CALL	great
-	BTFSC	W, 0   ; If W is equal to 1, return from here
+	GRTFF	lAdd, size
+	BTFSC	W, 0   ; W = 1 (outOfBounds). return from here
 	RETURN
+	
 	; Keep calculating address
 	MOVF	iniHAdd, W
 	ADDWF	lAdd, 1	    ; Calculating lChild address
 	
-	; Compare element of cAdd with element lAdd
+	; Compare element of "cAdd" with element "lAdd"
+	; Compare between two addresses. The max elemenent between two addresses
+	; Is sent to larger pointer.
+	
 	MOVF	cAdd, W	    ; val1
 	MOVWF	FSR
 	MOVF	INDF, W
@@ -165,7 +189,7 @@ loopHY	; Left child
 	MOVF	INDF, W
 	MOVWF	val2
 	call	great  
-	BTFSS	W, 0
+	BTFSC	W, 0
 	GOTO	lNotLarger
 	
 	MOVF	larger, W   ; If got here, lChild is larger
@@ -183,12 +207,8 @@ lNotLarger:
 	MOVF	iniHAdd, W
 	ADDWF	rAdd, 1	    ; Calculating rChild address
 	; check if rAdd (stil an index of rightChild)  is greater than size
-	MOVF	rAdd, W
-	MOVWF	val1
-	MOVF	size, W
-	MOVWF	val2
-	CALL	great
-	BTFSC	W, 0   ; If W is equal to 1, return from here
+	GRTFF	rAdd, size
+	BTFSC	W, 0   ; W = 1 (outOfBounds). Does not take rChild into consideration
 	GOTO	compareLarger
 	
 	; Compare element of rChild with element of Larger add
@@ -276,8 +296,8 @@ setup:
 	MOVWF	iniHAdd
 	DECF	iniHAdd, 1
 	
-	CALL buildMH
-
+;	CALL buildMH
+	
 	NOP
 
 	
