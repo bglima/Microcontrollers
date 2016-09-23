@@ -41,6 +41,27 @@ curB	EQU	0x2A	; Current address
 iniAdd	EQU	0x30	; Initial address of heap
 	GOTO	setup	; Initial setup of code
 	
+; val1 and val2 are the address of variables to be swapped
+SWAPFF	macro	add1, add2
+	MOVLW	add1
+	MOVWF	FSR
+	MOVF	INDF, W
+	MOVWF	temp1	; variable from val1 to temp	
+	
+	MOVLW	add2
+	MOVWF	FSR
+	MOVF	INDF, W	
+	MOVWF	temp2	; variable from val2 to temp
+	
+	MOVF	temp1, W
+	MOVWF	INDF	; temp1 to val2
+	MOVLW	add1
+	MOVWF	FSR
+	MOVF	temp2, W
+	MOVWF	INDF	; temp2 to val1
+	
+	ENDM
+	
 clearf:	; Function that clears flags Z and C from STATUS
 	BCF STATUS, Z
 	BCF STATUS, C
@@ -82,9 +103,9 @@ buildMH: ; buildMaxHeap function. Starts at node size/2 and goes back until it
 	
 loopBMH: ; Main loop of buildMaxHeap
 	MOVF	index, W
-	MOVWF	cInd
-	CALL	heapify
-	CALL	clearf
+;	MOVWF	cInd
+;	CALL	heapify
+;	CALL	clearf
 	
 	DECFSZ	index, 1    ; If index is zero, stop.
 	GOTO	loopBMH
@@ -194,11 +215,7 @@ compareLarger:
 	RETURN
 	
 largAndCAddDifferent:
-	MOVF	larger, W
-	MOVWF	val1
-	MOVF	cAdd, W
-	MOVWF	val2
-	CALL	swap
+	SWAPFF	larger, cAdd
 
 ; Call Heapify at next element
 	MOVF	larger, W
@@ -206,27 +223,6 @@ largAndCAddDifferent:
 	MOVWF	cInd
 	GOTO	loopHY
     
-	RETURN
-
-; val1 and val2 are the address of variables to be swapped
-swap:	
-	MOVF	val1, W
-	MOVWF	FSR
-	MOVF	INDF, W
-	MOVWF	temp1	; variable from val1 to temp	
-	
-	MOVF	val2, W
-	MOVWF	FSR
-	MOVF	INDF, W	
-	MOVWF	temp2	; variable from val2 to temp
-	
-	MOVF	temp1, W
-	MOVWF	INDF	; temp1 to val2
-	MOVF	val1, W
-	MOVWF	FSR
-	MOVF	temp2, W
-	MOVWF	INDF	; temp2 to val1
-	
 	RETURN
 
 rEEByte:		    ; Address to be read must be in W register. The result will override W.
@@ -275,7 +271,7 @@ setup:
 	DECF	iniHAdd, 1
 	
 	CALL buildMH
-	
+
 	NOP
 
 	
