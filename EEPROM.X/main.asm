@@ -41,7 +41,7 @@ curB	EQU	0x2A	; Current address
 iniAdd	EQU	0x30	; Initial address of heap
 	GOTO	setup	; Initial setup of code
 	
-; val1 and val2 are the address of variables to be swapped
+; "val1" and "val2" are the address of variables to be swapped
 SWAPFF	macro	add1, add2
 	MOVLW	add1
 	MOVWF	FSR
@@ -58,8 +58,14 @@ SWAPFF	macro	add1, add2
 	MOVLW	add1
 	MOVWF	FSR
 	MOVF	temp2, W
-	MOVWF	INDF	; temp2 to val1
-	
+	MOVWF	INDF	; temp2 to val1	
+	ENDM
+
+; Read value from address "add" to W
+READF	macro	add
+	MOVLW	add
+	MOVWF	FSR
+	MOVF	INDF, W
 	ENDM
 	
 clearf:	; Function that clears flags Z and C from STATUS
@@ -103,10 +109,10 @@ buildMH: ; buildMaxHeap function. Starts at node size/2 and goes back until it
 	
 loopBMH: ; Main loop of buildMaxHeap
 	MOVF	index, W
-;	MOVWF	cInd
-;	CALL	heapify
-;	CALL	clearf
-	
+	MOVWF	cInd
+	CALL	heapify
+
+	BSF	STATUS, Z
 	DECFSZ	index, 1    ; If index is zero, stop.
 	GOTO	loopBMH
 	RETURN
