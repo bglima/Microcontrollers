@@ -212,7 +212,7 @@ lNotLarger:
 	GOTO	compareLarger
 	
 	; Compare element of rChild with element of Larger add
-	MOVF	larger, W	    ; val1
+	MOVF	larger, W   ; val1
 	MOVWF	FSR
 	MOVF	INDF, W
 	MOVWF	val1	    
@@ -296,7 +296,7 @@ setup:
 	MOVWF	iniHAdd
 	DECF	iniHAdd, 1
 	
-;	CALL buildMH
+	CALL buildMH
 	
 	NOP
 
