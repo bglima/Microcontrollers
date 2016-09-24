@@ -40,22 +40,28 @@ maxB	EQU	0x29	; Max byte index of heap (size of heap)
 curB	EQU	0x2A	; Current address
 iniAdd	EQU	0x30	; Initial address of heap
 	GOTO	setup	; Initial setup of code
-	
+
+csgtf macro fr1,fr2
+          movf fr1,w
+          subwf fr2,w
+          btfsc STATUS,C
+          endm
+
 ; "val1" and "val2" are the address of variables to be swapped
-SWAPFF	macro	add1, add2
-	MOVLW	add1
+SWAPPP	macro	add1, add2
+	MOVF	add1, W
 	MOVWF	FSR
 	MOVF	INDF, W
 	MOVWF	temp1	; variable from val1 to temp	
 	
-	MOVLW	add2
+	MOVF	add2, W
 	MOVWF	FSR
 	MOVF	INDF, W	
 	MOVWF	temp2	; variable from val2 to temp
 	
 	MOVF	temp1, W
 	MOVWF	INDF	; temp1 to val2
-	MOVLW	add1
+	MOVF	add1, W
 	MOVWF	FSR
 	MOVF	temp2, W
 	MOVWF	INDF	; temp2 to val1	
@@ -68,29 +74,49 @@ READF	macro	addr
 	MOVF	INDF, W
 	ENDM
 	
-; Check if an index if larger than max index from heap (out of bounds)
-; W = 1 if index is OutOfBounds
-GRTFF	macro   add1, add2
+; Compare pointers, Add1 and Add2 are pointers to elmeents to be compared.
+; W = 1 if element that Add1 points is greater.
+GRTPP	macro   add1, add2
 	CALL	clearf	    ; Clear flags before use it
 	
-	MOVLW	add1
+	MOVF	add1, W
 	MOVWF	FSR
 	MOVF	INDF, W
 	MOVWF	val1
 	
-	MOVLW	add2
+	MOVF	add2, W
 	MOVWF	FSR
 	MOVF	INDF, W
 	MOVWF	val2
 	
-	MOVF	val1, W
-	SUBWF	val2, W
-	MOVLW	0x00	    ; Assume that index is larger than size
-	BTFSS	STATUS, C
-	MOVLW	0x01	    ; Size is greater. Return OutOfBounds (W = 1)
+	CALL	great
 	ENDM
 
+; Compare elements from registers reg1 and reg2.
+; W = 1 if element that Add1 points is greater.
+GRTFF	macro   reg1, reg2
+	MOVF	reg1, W
+	MOVWF	val1
+	MOVF	reg2, W
+	MOVWF	val2
+	CALL	great	
+	ENDM
 
+EQFF	macro	reg1, reg2
+	CALL	clearf
+	MOVF	reg1, W
+	MOVWF	val1
+	MOVF	reg2, W
+	MOVWF	val2
+	
+	MOVF	val1, W
+	SUBWF	val2, W
+	MOVLW	0x00	    ; Assume they are different
+	
+	BTFSC	STATUS, Z
+	MOVLW	0x01	    ; Size is greater. Return OutOfBounds (W = 1)
+
+	ENDM
 	
 clearf:	; Function that clears flags Z and C from STATUS
 	BCF STATUS, Z
@@ -136,41 +162,35 @@ loopBMH: ; Main loop of buildMaxHeap
 	MOVWF	cInd
 	CALL	heapify
 
-	BSF	STATUS, Z
+	BCF	STATUS, Z
 	DECFSZ	index, 1    ; If index is zero, stop.
 	GOTO	loopBMH
 	RETURN
 
 heapify: ; Function that check which element is greater ammong addresses 
-	 ; cAdd, rAdd and lAdd. Return the address of larger element
-	MOVWF	cInd	    ; Storing current index
-	MOVWF	cAdd	    ; Moving current index to cAdd
+	CALL	clearf
 	
+	MOVF	cInd, W
+	MOVWF	lAdd	    ; Left child. Used for now as an index.
+	MOVWF	rAdd	    ; Right child. Used for now as an index.
 	
 	ADDWF	iniHAdd, W
 	MOVWF	cAdd	    ; Now, cAdd contains the address of cInd element
 
-loopHY	; Left child
-	CALL	clearf
-	
-	MOVF	cInd, W
-	MOVWF	cAdd
-	MOVWF	lAdd	    ; Left child
-	MOVWF	rAdd	    ; Right child
 	
 	; Initiate cInd as larger
-	MOVF	iniHAdd, W
-	ADDWF	cAdd, 1
-	MOVF	cAdd, W
 	MOVWF	larger	    ; Address of larger number initiate as cAdd
 	
 	; Calculating left child address
 	BCF	lAdd, 7	    ; Clean MSB so that rotate does not set STATUS, C
 	RLF	lAdd, 1	    ; Rotate rAdd to left and store on its own
 	; if lAdd (stil an index of leftChild)  is greater than size, stop
-	GRTFF	lAdd, size
-	BTFSC	W, 0   ; W = 1 (outOfBounds). return from here
+;	GRTFF	lAdd, size  ; W = 1 (outOfBounds). return from here
+;	BTFSC	W, 0
+	csgtf	size, lAdd
 	RETURN
+	
+	
 	
 	; Keep calculating address
 	MOVF	iniHAdd, W
@@ -180,24 +200,14 @@ loopHY	; Left child
 	; Compare between two addresses. The max elemenent between two addresses
 	; Is sent to larger pointer.
 	
-	MOVF	cAdd, W	    ; val1
-	MOVWF	FSR
-	MOVF	INDF, W
-	MOVWF	val1	    
-	MOVF	lAdd, W	    ; val2
-	MOVWF	FSR
-	MOVF	INDF, W
-	MOVWF	val2
-	call	great  
-	BTFSC	W, 0
-	GOTO	lNotLarger
+	GRTPP	lAdd, cAdd
+	BTFSS	W, 0
+	GOTO	calcRightChild
 	
-	MOVF	larger, W   ; If got here, lChild is larger
-	MOVWF	FSR
-	MOVF	val2, W
-	MOVWF	INDF
+	MOVF	lAdd, W   ; If got here, lChild is larger
+	MOVWF	larger
 
-lNotLarger:
+calcRightChild:
 	; Right child address
 	BCF	rAdd, 7
 	RLF	rAdd, 1
@@ -206,48 +216,36 @@ lNotLarger:
 
 	MOVF	iniHAdd, W
 	ADDWF	rAdd, 1	    ; Calculating rChild address
-	; check if rAdd (stil an index of rightChild)  is greater than size
+	; check if rAdd (still an index of rightChild)  is greater than size
 	GRTFF	rAdd, size
 	BTFSC	W, 0   ; W = 1 (outOfBounds). Does not take rChild into consideration
-	GOTO	compareLarger
+	GOTO	compareLargerWithParent
 	
 	; Compare element of rChild with element of Larger add
-	MOVF	larger, W   ; val1
-	MOVWF	FSR
-	MOVF	INDF, W
-	MOVWF	val1	    
-	MOVF	rAdd, W	    ; val2
-	MOVWF	FSR
-	MOVF	INDF, W
-	MOVWF	val2
-	call	great  
+	GRTPP	larger, rAdd
 	BTFSS	W, 0
-	GOTO	compareLarger
+	GOTO	compareLargerWithParent
 	
-	MOVF	larger, W   ; If got here, lChild is larger
+	MOVF	larger, W   ; If got here, rChild is larger
 	MOVWF	FSR
 	MOVF	val2, W
 	MOVWF	INDF
 	
 
-compareLarger:
+compareLargerWithParent:
 	; Compare if larger address is different than cAdd
-	MOVF	larger, W
-	MOVWF	val1
-	MOVF	cAdd, W
-	MOVWF	val2
-	CALL	diff
+	EQFF	larger, cAdd
 	BTFSS	W, 0
 	RETURN
 	
 largAndCAddDifferent:
-	SWAPFF	larger, cAdd
+	SWAPPP	larger, cAdd
 
 ; Call Heapify at next element
-	MOVF	larger, W
-	SUBWF	iniHAdd, 0
+	MOVF	iniHAdd, W
+	SUBWF	larger, W	
 	MOVWF	cInd
-	GOTO	loopHY
+	GOTO	heapify
     
 	RETURN
 
@@ -297,7 +295,7 @@ setup:
 	DECF	iniHAdd, 1
 	
 	CALL buildMH
-	
+
 	NOP
 
 	
