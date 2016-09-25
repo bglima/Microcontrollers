@@ -1,3 +1,5 @@
+; Loads two values. From pointers add1 and add2
+;    to val1 and val2 registers, respectively.
 LOADPF	macro	add1, add2
 	MOVF	add1, W
 	MOVWF	FSR
