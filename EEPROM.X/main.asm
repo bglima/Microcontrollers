@@ -41,7 +41,7 @@ maxB	EQU	0x29	; Max byte index of heap (size of heap)
 curB	EQU	0x2A	; Current address
 iniAdd	EQU	0x30	; Initial address of heap
 	GOTO	setup	; Initial setup of code
-	
+
 clearf:	; Function that clears flags Z and C from STATUS
 	BCF STATUS, Z
 	BCF STATUS, C
@@ -143,11 +143,10 @@ rEEByte:		    ; Address to be read must be in W register. The result will overri
 	RETURN	
 
 rEEData:		    ; Read maxB bytes from EEPROM. curB is the current byte index. 
-	MOVLW	iniAdd      ; Start to store values at iniAdd addres = 0x22
+	MOVLW	iniAdd      ; Start to store values at iniAdd address
 	MOVWF	FSR	    ; indirect address starts at 0x22
 	MOVLW	0x01	    ; byte index starts at 1
 	MOVWF	curB	    ; first addres to be read from EEPROM
-
 rEELoop:
 	CALL	rEEByte
 	MOVWF	INDF
@@ -161,6 +160,59 @@ rEELoop:
 	RETURN
 	MOVF	curB, W
 	GOTO	rEELoop	
+	
+wEEByte:
+	BSF	STATUS, RP0  ;Bank 1
+	BSF	EECON1, WREN ;Enable write
+	BCF	INTCON, GIE  ;Disable INTs.
+	BTFSC	INTCON,GIE   ;See AN576
+	GOTO	$-2
+	MOVLW	0x55 ;
+	MOVWF	EECON2	    ;Write 55h
+	MOVLW	0xAA ;
+	MOVWF	EECON2	    ;Write AAh
+	BSF	EECON1,WR   ;Set WR bit
+	 ;begin write
+	BSF INTCON, GIE	    ;Enable INTs.
+	BCF	STATUS, RP0 ;Bank 0
+	RETURN
+
+wEEData:
+	BANKSEL	EEADR
+	MOVLW	0x10
+	MOVWF	EEADR
+	BANKSEL PORTA
+	MOVF	size, W	    ; Write size to frist byte
+	BANKSEL EEADR
+	MOVWF	EEDATA
+	CALL	wEEByte	    ; Initiate writing
+	
+	BCF	STATUS, RP0 ; Bank0
+	MOVLW	iniAdd	    ; Initial address
+	MOVWF	FSR	
+	MOVLW	0x11	    ; First data adress from EEPROM
+	
+	MOVWF	curB	    ; EEPROM address counter. Starts at 0x11
+	ADDWF	size, W	    ; Max adress to be written to
+	MOVWF	maxB	    ; Stores at maxB
+	MOV
+wEELoop:
+	BCF	STATUS, RP0 ; Bank 0
+	MOVF	curB, W
+	BSF	STATUS, RP0 ; Bank 1
+	MOVWF	EEADR	    ; Set EE address
+	MOVF	INDF, W
+	MOVWF	EEDATA	    ; Set EE data
+	CALL	wEEByte
+	
+	BCF	STATUS, RP0
+	INCF	FSR
+	INCF	curB
+	
+	CSGEF	curB, maxB
+	GOTO	wEELoop	
+	
+	RETURN
 
 setup:
 	BANKSEL	PORTA
@@ -178,7 +230,8 @@ setup:
 	MOVWF	iniHAdd
 	DECF	iniHAdd, 1
 	
-	CALL buildMH
+	CALL	buildMH	
+	CALL	wEEData	
 	NOP
 	
 loop:	
